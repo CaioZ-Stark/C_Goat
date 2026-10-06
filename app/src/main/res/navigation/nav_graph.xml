@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_camera">
+
+    <fragment
+        android:id="@+id/navigation_camera"
+        android:name="com.ifpr.androidapptemplatear.ui.CameraFragment"
+        android:label="@string/camera"
+        tools:layout="@layout/fragment_camera" />
+
+    <fragment
+        android:id="@+id/navigation_changeobject"
+        android:name="com.ifpr.androidapptemplatear.ui.ChangeObjectFragment"
+        android:label="@string/change"
+        tools:layout="@layout/fragment_changeobject" />
+
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.ifpr.androidapptemplatear.ui.ProfileFragment"
+        android:label="@string/profile"
+        tools:layout="@layout/fragment_profile" />
+</navigation>
