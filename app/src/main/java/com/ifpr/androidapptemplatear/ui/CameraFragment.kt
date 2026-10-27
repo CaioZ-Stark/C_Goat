@@ -24,9 +24,39 @@ import io.github.sceneview.ar.node.PlacementMode
 import io.github.sceneview.math.Position
 import okio.IOException
 import java.io.File
+import android.animation.ValueAnimator
+import android.os.Handler
+import android.os.Looper
+import android.widget.Button
+import android.widget.GridLayout
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import io.github.sceneview.math.Rotation
+import kotlin.random.Random
 
 class CameraFragment : Fragment() {
 
+    private lateinit var btnBattle: ExtendedFloatingActionButton
+    private lateinit var selectionOverlay: View
+    private lateinit var battleHud: View
+    private lateinit var enemyPanel: View
+    private lateinit var movesGrid: GridLayout
+    private lateinit var battleLog: TextView
+    private lateinit var playerHpBar: ProgressBar
+    private lateinit var enemyHpBar: ProgressBar
+    private lateinit var playerNameTv: TextView
+    private lateinit var enemyNameTv: TextView
+
+    private var inBattle = false
+    private var battleStarted = false   // true depois de fixar o dragão e criar o inimigo
+    private var playerDragon: Dragon? = null
+    private var enemyDragon: Dragon? = null
+    private var playerHp = 0
+    private var enemyHp = 0
+    private var enemyNode: ArModelNode? = null
+    private var turnLocked = false
+    private val handler = Handler(Looper.getMainLooper())
     private lateinit var sceneView: ArSceneView
     private lateinit var modelNode: ArModelNode
     private lateinit var placeButton: ExtendedFloatingActionButton
@@ -69,7 +99,7 @@ class CameraFragment : Fragment() {
                 loadModel(path)
             }
         }
-
+        setupBattleUi(view)
         return view
     }
 
@@ -79,6 +109,7 @@ class CameraFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        handler.removeCallbacksAndMessages(null)
         releaseAudio()
         _binding = null
         super.onDestroyView()
@@ -95,6 +126,7 @@ class CameraFragment : Fragment() {
 
         // Reproduz o som correspondente ao modelo posicionado
         playModelSound(currentModelFile)
+        if (inBattle && !battleStarted) startBattle()
     }
 
 
@@ -268,5 +300,168 @@ class CameraFragment : Fragment() {
                 fileName
             }
         }
+    }
+    private fun setupBattleUi(v: View) {
+        btnBattle = v.findViewById(R.id.btnBattle)
+        selectionOverlay = v.findViewById(R.id.selectionOverlay)
+        battleHud = v.findViewById(R.id.battleHud)
+        enemyPanel = v.findViewById(R.id.enemyPanel)
+        movesGrid = v.findViewById(R.id.movesGrid)
+        battleLog = v.findViewById(R.id.battleLog)
+        playerHpBar = v.findViewById(R.id.playerHpBar)
+        enemyHpBar = v.findViewById(R.id.enemyHpBar)
+        playerNameTv = v.findViewById(R.id.playerName)
+        enemyNameTv = v.findViewById(R.id.enemyName)
+
+        btnBattle.setOnClickListener {
+            selectionOverlay.visibility = View.VISIBLE
+            btnBattle.visibility = View.GONE
+            placeButton.visibility = View.GONE
+        }
+
+        val buttons = listOf(R.id.btnDragon1, R.id.btnDragon2, R.id.btnDragon3)
+        Dragons.all.forEachIndexed { i, dragon ->
+            v.findViewById<Button>(buttons[i]).apply {
+                text = "${dragon.name}  (HP ${dragon.maxHp})"
+                setOnClickListener { chooseDragon(dragon) }
+            }
+        }
+
+        v.findViewById<View>(R.id.btnCancelSelect).setOnClickListener { exitBattle() }
+        v.findViewById<View>(R.id.btnExitBattle).setOnClickListener { exitBattle() }
+    }
+
+    private fun chooseDragon(dragon: Dragon) {
+        inBattle = true
+        battleStarted = false
+        playerDragon = dragon
+        enemyDragon = Dragons.all.filter { it != dragon }.random()
+
+        selectionOverlay.visibility = View.GONE
+        placeButton.visibility = View.VISIBLE
+        Toast.makeText(requireContext(),
+            "Aponte para o chão e toque em Place", Toast.LENGTH_LONG).show()
+
+        loadModel(dragon.glb)   // reaproveita o seu loadModel
+    }
+
+    private fun startBattle() {
+        val player = playerDragon ?: return
+        val enemy = enemyDragon ?: return
+        battleStarted = true
+
+        // Inimigo ao lado do jogador, no mundo (não ancorado, para não brigar com a âncora do jogador)
+        enemyNode = ArModelNode(sceneView.engine, PlacementMode.DISABLED).apply {
+            loadModelGlbAsync(
+                glbFileLocation = getFilePath(requireContext(), enemy.glb),
+                centerOrigin = Position(0f, 0f, 1f)
+            )
+            worldPosition = modelNode.worldPosition + Position(x = 1.2f)
+            rotation = Rotation(y = 180f)   // vira de frente para o jogador (ajuste se precisar)
+        }
+        sceneView.addChild(enemyNode!!)
+
+        playerHp = player.maxHp
+        enemyHp = enemy.maxHp
+        playerHpBar.max = player.maxHp; playerHpBar.progress = playerHp
+        enemyHpBar.max = enemy.maxHp; enemyHpBar.progress = enemyHp
+        playerNameTv.text = player.name
+        enemyNameTv.text = enemy.name
+
+        movesGrid.removeAllViews()
+        player.moves.forEach { move ->
+            movesGrid.addView(Button(requireContext()).apply {
+                text = "${move.name} (${move.power})"
+                layoutParams = GridLayout.LayoutParams().apply {
+                    width = 0
+                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                }
+                setOnClickListener { playerAttack(move) }
+            })
+        }
+
+        placeButton.visibility = View.GONE
+        battleHud.visibility = View.VISIBLE
+        enemyPanel.visibility = View.VISIBLE
+        setMovesEnabled(true)
+        battleLog.text = "Um ${enemy.name} selvagem apareceu!"
+    }
+
+    private fun playerAttack(move: Move) {
+        if (turnLocked) return
+        turnLocked = true
+        setMovesEnabled(false)
+        val player = playerDragon ?: return
+
+        battleLog.text = "${player.name} usou ${move.name}!"
+        lunge(modelNode, +1f)
+        handler.postDelayed({
+            val dmg = rollDamage(move)
+            enemyHp = (enemyHp - dmg).coerceAtLeast(0)
+            enemyHpBar.progress = enemyHp
+            battleLog.text = if (dmg == 0) "${player.name} errou!" else "Causou $dmg de dano!"
+
+            if (enemyHp == 0) endBattle(won = true)
+            else handler.postDelayed({ enemyAttack() }, 1100)
+        }, 300)
+    }
+
+    private fun enemyAttack() {
+        val enemy = enemyDragon ?: return
+        val node = enemyNode ?: return
+        val move = enemy.moves.random()
+
+        battleLog.text = "${enemy.name} usou ${move.name}!"
+        lunge(node, +1f)
+        handler.postDelayed({
+            val dmg = rollDamage(move)
+            playerHp = (playerHp - dmg).coerceAtLeast(0)
+            playerHpBar.progress = playerHp
+            battleLog.text = if (dmg == 0) "${enemy.name} errou!" else "Você levou $dmg de dano!"
+
+            if (playerHp == 0) endBattle(won = false)
+            else { turnLocked = false; setMovesEnabled(true) }
+        }, 300)
+    }
+
+    private fun rollDamage(move: Move): Int =
+        if (Random.nextInt(100) < move.accuracy) (move.power + Random.nextInt(-3, 4)).coerceAtLeast(1) else 0
+
+    // Avança o modelo em direção ao oponente e volta (mexe só no modelo, não na âncora)
+    private fun lunge(node: ArModelNode, direction: Float) {
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 250
+            repeatCount = 1
+            repeatMode = ValueAnimator.REVERSE
+            addUpdateListener {
+                val t = it.animatedValue as Float
+                node.modelPosition = node.modelPosition.copy(x = direction * 0.5f * t)
+            }
+            start()
+        }
+        playerDragon?.let { if (node === modelNode) playModelSound(it.glb) }
+        enemyDragon?.let { if (node === enemyNode) playModelSound(it.glb) }
+    }
+
+    private fun setMovesEnabled(enabled: Boolean) {
+        for (i in 0 until movesGrid.childCount) movesGrid.getChildAt(i).isEnabled = enabled
+    }
+
+    private fun endBattle(won: Boolean) {
+        battleLog.text = if (won) "Você venceu! 🐉" else "Seu dragão foi derrotado..."
+        setMovesEnabled(false)
+    }
+
+    private fun exitBattle() {
+        handler.removeCallbacksAndMessages(null)
+        enemyNode?.let { sceneView.removeChild(it) }
+        enemyNode = null
+        inBattle = false; battleStarted = false; turnLocked = false
+
+        selectionOverlay.visibility = View.GONE
+        battleHud.visibility = View.GONE
+        enemyPanel.visibility = View.GONE
+        btnBattle.visibility = View.VISIBLE
+        placeButton.visibility = View.VISIBLE
     }
 }

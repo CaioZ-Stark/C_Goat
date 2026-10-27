@@ -40,5 +40,86 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/btnBattle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Modo batalha"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Tela de escolha do dragão -->
+    <LinearLayout
+        android:id="@+id/selectionOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        android:background="#E6101820">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Escolha seu dragão"
+            android:textColor="@android:color/white"
+            android:textSize="24sp"
+            android:layout_marginBottom="24dp" />
+
+        <Button android:id="@+id/btnDragon1" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="12dp" />
+        <Button android:id="@+id/btnDragon2" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="12dp" />
+        <Button android:id="@+id/btnDragon3" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="12dp" />
+        <Button android:id="@+id/btnCancelSelect" style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cancelar" />
+    </LinearLayout>
+
+    <!-- Inimigo (topo) -->
+    <LinearLayout
+        android:id="@+id/enemyPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:layout_margin="12dp"
+        android:background="#CC000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="90dp">
+        <TextView android:id="@+id/enemyName" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" />
+        <ProgressBar android:id="@+id/enemyHpBar" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="12dp" />
+    </LinearLayout>
+
+    <!-- Jogador + golpes (embaixo) -->
+    <LinearLayout
+        android:id="@+id/battleHud"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="#CC000000"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+        <TextView android:id="@+id/playerName" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" />
+        <ProgressBar android:id="@+id/playerHpBar" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="12dp" />
+        <TextView android:id="@+id/battleLog" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textColor="#FFD54F" android:paddingVertical="8dp" />
+        <GridLayout android:id="@+id/movesGrid" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:columnCount="2" />
+        <Button android:id="@+id/btnExitBattle" style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Sair da batalha" android:layout_gravity="end" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+
