@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.random.Random
 
+
 class CameraFragment : Fragment() {
 
     private enum class Mode {
@@ -69,7 +70,11 @@ class CameraFragment : Fragment() {
         private const val CAMERA_TIMEOUT_MS = 8000L
         private const val AUDIO_TAG = "DRAGON_AUDIO"
     }
+    private lateinit var gameOverOverlay: View
+    private lateinit var gameOverTitle: TextView
+    private lateinit var gameOverMsg: TextView
 
+    private lateinit var btnRematch: Button
     // ---------------------------------------------------------------
     // Estado de cena / modo (base do professor)
     // ---------------------------------------------------------------
@@ -578,7 +583,7 @@ class CameraFragment : Fragment() {
             )
 
             scene.lifecycle = viewLifecycleOwner.lifecycle
-            scene.cameraNode.position = Position(0f, 0f, 3f)
+            scene.cameraNode.position = Position(0f, 0f, 5f)
             scene.cameraNode.lookAt(Position(0f, 0f, 0f))
 
             sceneView = scene
@@ -839,7 +844,11 @@ class CameraFragment : Fragment() {
         }
     }
 
-    private fun modelScale(): Float = if (mode == Mode.AR) 0.5f else 1.5f
+    private fun modelScale(): Float = when {
+        mode == Mode.AR -> 0.5f
+        inBattle -> 0.7f
+        else -> 1.0f
+    }
 
     private fun modelLocation(fileName: String): String? {
         val context = context ?: return null
@@ -1038,7 +1047,15 @@ class CameraFragment : Fragment() {
         }
         mediaPlayer = null
     }
+    private fun restartBattle() {
+        handler.removeCallbacksAndMessages(null)
+        removeEnemy()
+        battleStarted = false
+        turnLocked = false
 
+        gameOverOverlay.visibility = View.GONE
+        startBattle()   // mesmo enemyDragon, vida cheia dos dois
+    }
     // ---------------------------------------------------------------
     // Batalha (seu código, adaptado para a API nova)
     // ---------------------------------------------------------------
@@ -1069,13 +1086,21 @@ class CameraFragment : Fragment() {
         }
 
         v.findViewById<View>(R.id.btnCancelSelect).setOnClickListener { exitBattle() }
-        v.findViewById<View>(R.id.btnExitBattle).setOnClickListener { exitBattle() }
+        v.findViewById<View>(R.id.btnExitBattle).setOnClickListener { leaveBattle() }
 
         // Garante que a UI de batalha fique acima da cena e do painel de status
         btnBattle.bringToFront()
         battleHud.bringToFront()
         enemyPanel.bringToFront()
         selectionOverlay.bringToFront()
+
+        gameOverOverlay = v.findViewById(R.id.gameOverOverlay)
+        gameOverTitle = v.findViewById(R.id.gameOverTitle)
+        gameOverMsg = v.findViewById(R.id.gameOverMsg)
+        btnRematch = v.findViewById(R.id.btnRematch)
+        gameOverOverlay.bringToFront()
+        btnRematch.setOnClickListener { restartBattle() }
+        v.findViewById<View>(R.id.btnQuit).setOnClickListener { leaveBattle() }
     }
 
     private fun chooseDragon(dragon: Dragon) {
@@ -1098,10 +1123,14 @@ class CameraFragment : Fragment() {
         }
         Toast.makeText(requireContext(), hint, Toast.LENGTH_LONG).show()
 
+
+        statusText?.text = "Carregando ${dragon.name}…"
         loadModel()
+        preloadEnemy()   // sempre depois do loadModel()
     }
 
     private fun startBattle() {
+
         val player = playerDragon ?: return
         val enemy = enemyDragon ?: return
         val scene = sceneView ?: return
@@ -1126,41 +1155,24 @@ class CameraFragment : Fragment() {
 
         // AR: jogador fica na âncora e o inimigo ao lado (modelo tem 0.5 de tamanho)
         // Sem AR: jogador à esquerda e inimigo à direita
-        val playerX = if (isAr) 0f else -0.9f
-        val enemyX = if (isAr) 0.6f else 0.9f
+        val playerX = if (isAr) 0f else -0.55f
+        val enemyX = if (isAr) 0.6f else 0.55f
 
         playerModel.position = Position(x = playerX)
 
-        enemyLoadJob?.cancel()
+        val pending = enemyLoadJob   // pré-carregamento em andamento (não cancelar)
         enemyLoadJob = viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val instance = scene.modelLoader.loadModelInstance(location)
-
-                if (
-                    expected != generation ||
-                    sceneView !== scene ||
-                    instance == null
-                ) {
+                pending?.join()
+                val node = enemyNode ?: buildEnemyNode(scene, enemy, enemyX)
+                if (node == null || expected != generation || sceneView !== scene) {
                     return@launch
                 }
-
-                val node = ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = modelScale(),
-                    centerOrigin = Position(0f, 0f, 0f)
-                ).apply {
-                    position = Position(x = enemyX)
-                    rotation = Rotation(y = 180f) // vira de frente para o jogador
-                }
-
                 enemyNode = node
 
                 val anchor = anchorNode
-                if (isAr && anchor != null) {
-                    anchor.addChildNode(node)
-                } else {
-                    scene.addChildNode(node)
-                }
+                if (isAr && anchor != null) anchor.addChildNode(node)
+                else scene.addChildNode(node)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1218,7 +1230,13 @@ class CameraFragment : Fragment() {
 
     private fun enemyAttack() {
         val enemy = enemyDragon ?: return
-        val node = enemyNode ?: return
+        val node = enemyNode
+        if (node == null) {
+            // inimigo não carregou: devolve o turno para o jogador
+            turnLocked = false
+            setMovesEnabled(true)
+            return
+        }
         val move = enemy.moves.random()
 
         battleLog.text = "${enemy.name} usou ${move.name}!"
@@ -1242,7 +1260,7 @@ class CameraFragment : Fragment() {
     // Avança o modelo em direção ao oponente e volta
     private fun lunge(node: ModelNode, direction: Float) {
         val base = node.position
-        val reach = if (mode == Mode.AR) 0.25f else 0.6f
+        val reach = if (mode == Mode.AR) 0.25f else 0.3f
 
         ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 250
@@ -1266,8 +1284,26 @@ class CameraFragment : Fragment() {
     }
 
     private fun endBattle(won: Boolean) {
-        battleLog.text = if (won) "Você venceu! 🐉" else "Seu dragão foi derrotado..."
         setMovesEnabled(false)
+        battleLog.text = if (won) "Você venceu!" else "Seu dragão foi derrotado..."
+
+        // Espera um pouco para o jogador ver o último golpe
+        handler.postDelayed({
+            val player = playerDragon?.name ?: ""
+            val enemy = enemyDragon?.name ?: ""
+
+            if (won) {
+                gameOverTitle.text = "Vitória!"
+                gameOverTitle.setTextColor(0xFFFFD54F.toInt())
+                gameOverMsg.text = "$player derrotou $enemy."
+            } else {
+                gameOverTitle.text = "Game Over"
+                gameOverTitle.setTextColor(0xFFEF5350.toInt())
+                gameOverMsg.text = "$enemy derrotou $player."
+            }
+            gameOverOverlay.visibility = View.VISIBLE
+            btnRematch.text = "Lutar de novo contra $enemy"
+        }, 1200)
     }
 
     private fun exitBattle() {
@@ -1284,5 +1320,47 @@ class CameraFragment : Fragment() {
         btnBattle.visibility = View.VISIBLE
         placeButton?.visibility = View.VISIBLE
         overlay?.visibility = View.VISIBLE
+        gameOverOverlay.visibility = View.GONE
+        modelNode?.position = Position(0f, 0f, 0f)
+        if (mode != Mode.AR) placeButton?.text = "Centralizar"
+    }
+    private suspend fun buildEnemyNode(scene: SceneView, enemy: Dragon, x: Float): ModelNode? {
+        val location = modelLocation(enemy.glb) ?: return null
+        val instance = scene.modelLoader.loadModelInstance(location) ?: return null
+        return ModelNode(
+            modelInstance = instance,
+            scaleToUnits = modelScale(),
+            centerOrigin = Position(0f, 0f, 0f)
+        ).apply {
+            position = Position(x = x)
+            rotation = Rotation(y = 180f)
+        }
+    }
+
+    private fun preloadEnemy() {
+        val scene = sceneView ?: return
+        val enemy = enemyDragon ?: return
+        val expected = generation
+        val x = if (mode == Mode.AR) 0.6f else 0.55f
+
+        enemyLoadJob?.cancel()
+        enemyLoadJob = viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val node = buildEnemyNode(scene, enemy, x) ?: return@launch
+                if (expected != generation || sceneView !== scene) {
+                    node.destroy()
+                    return@launch
+                }
+                enemyNode = node   // pronto, mas ainda fora da cena
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(AUDIO_TAG, "Erro ao pré-carregar inimigo", e)
+            }
+        }
+    }
+    private fun leaveBattle() {
+        exitBattle()
+        loadModel()   // recarrega na escala normal
     }
 }

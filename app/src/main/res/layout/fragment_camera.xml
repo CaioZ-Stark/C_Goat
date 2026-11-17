@@ -195,5 +195,48 @@
             android:text="Cancelar"
             android:textColor="@android:color/white" />
     </LinearLayout>
+    <LinearLayout
+        android:id="@+id/gameOverOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        android:background="#F2000000">
+
+        <TextView
+            android:id="@+id/gameOverTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="40sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/gameOverMsg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="32dp"
+            android:textSize="16sp"
+            android:textAlignment="center"
+            android:textColor="#CCFFFFFF" />
+
+        <Button
+            android:id="@+id/btnRematch"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginBottom="12dp"
+            android:text="Lutar de novo" />
+
+        <Button
+            android:id="@+id/btnQuit"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="Voltar ao início" />
+    </LinearLayout>
 
 </FrameLayout>
