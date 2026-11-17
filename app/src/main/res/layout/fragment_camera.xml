@@ -84,7 +84,7 @@
             android:progressTint="#E53935" />
     </LinearLayout>
 
-    <!-- HUD do jogador: nome, HP, log e golpes -->
+    <!-- HUD do jogador: placar, nome, HP, log e golpes -->
     <LinearLayout
         android:id="@+id/battleHud"
         android:layout_width="match_parent"
@@ -94,6 +94,18 @@
         android:orientation="vertical"
         android:padding="12dp"
         android:visibility="gone">
+
+        <!-- NOVO: placar -->
+        <TextView
+            android:id="@+id/scoreText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:paddingBottom="6dp"
+            android:text="Pontos: 0"
+            android:textColor="#FFD54F"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -195,35 +207,47 @@
             android:text="Cancelar"
             android:textColor="@android:color/white" />
     </LinearLayout>
+
+    <!-- Tela de fim de batalha (Vitória / Game Over) -->
     <LinearLayout
         android:id="@+id/gameOverOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:padding="32dp"
+        android:background="#F2000000"
         android:clickable="true"
         android:focusable="true"
-        android:visibility="gone"
-        android:background="#F2000000">
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone">
 
         <TextView
             android:id="@+id/gameOverTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
             android:textSize="40sp"
-            android:textStyle="bold"
-            android:textColor="@android:color/white" />
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/gameOverMsg"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="32dp"
-            android:textSize="16sp"
+            android:layout_marginBottom="8dp"
             android:textAlignment="center"
-            android:textColor="#CCFFFFFF" />
+            android:textColor="#CCFFFFFF"
+            android:textSize="16sp" />
+
+        <!-- NOVO: pontos ganhos/perdidos, total e recorde -->
+        <TextView
+            android:id="@+id/gameOverScore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="32dp"
+            android:textAlignment="center"
+            android:textColor="#FFD54F"
+            android:textSize="18sp" />
 
         <Button
             android:id="@+id/btnRematch"

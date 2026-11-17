@@ -2,6 +2,7 @@ package com.ifpr.androidapptemplatear.ui
 
 import android.Manifest
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.media.MediaPlayer
@@ -69,6 +70,12 @@ class CameraFragment : Fragment() {
         private const val AR_TIMEOUT_MS = 15000L
         private const val CAMERA_TIMEOUT_MS = 8000L
         private const val AUDIO_TAG = "DRAGON_AUDIO"
+
+        // Pontuação
+        private const val POINTS_PER_WIN = 100
+        private const val PREFS_NAME = "dragon_battle"
+        private const val KEY_SCORE = "score"
+        private const val KEY_BEST = "best_score"
     }
 
     // ---------------------------------------------------------------
@@ -137,6 +144,10 @@ class CameraFragment : Fragment() {
     private lateinit var gameOverTitle: TextView
     private lateinit var gameOverMsg: TextView
     private lateinit var btnRematch: Button
+    private lateinit var scoreText: TextView
+    private lateinit var gameOverScore: TextView
+    private var score = 0
+    private var bestScore = 0
 
     private var inBattle = false
     private var battleStarted = false   // true depois de fixar o dragão e criar o inimigo
@@ -1097,6 +1108,9 @@ class CameraFragment : Fragment() {
         gameOverTitle = v.findViewById(R.id.gameOverTitle)
         gameOverMsg = v.findViewById(R.id.gameOverMsg)
         btnRematch = v.findViewById(R.id.btnRematch)
+        scoreText = v.findViewById(R.id.scoreText)
+        gameOverScore = v.findViewById(R.id.gameOverScore)
+        loadScore()
 
         btnBattle.setOnClickListener {
             selectionOverlay.visibility = View.VISIBLE
@@ -1300,9 +1314,40 @@ class CameraFragment : Fragment() {
         }
     }
 
+    private fun prefs() =
+        requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun loadScore() {
+        score = prefs().getInt(KEY_SCORE, 0)
+        bestScore = prefs().getInt(KEY_BEST, 0)
+        updateScoreUi()
+    }
+
+    private fun saveScore() {
+        prefs().edit()
+            .putInt(KEY_SCORE, score)
+            .putInt(KEY_BEST, bestScore)
+            .apply()
+    }
+
+    private fun updateScoreUi() {
+        scoreText.text = "Pontos: $score   Recorde: $bestScore"
+    }
+
     private fun endBattle(won: Boolean) {
         setMovesEnabled(false)
         battleLog.text = if (won) "Você venceu!" else "Seu dragão foi derrotado..."
+
+        // Atualiza e salva a pontuação na hora (antes do atraso da tela final)
+        val lostPoints = score
+        if (won) {
+            score += POINTS_PER_WIN
+            if (score > bestScore) bestScore = score
+        } else {
+            score = 0
+        }
+        saveScore()
+        updateScoreUi()
 
         // Espera um pouco para o jogador ver o último golpe
         handler.postDelayed({
@@ -1313,10 +1358,17 @@ class CameraFragment : Fragment() {
                 gameOverTitle.text = "Vitória!"
                 gameOverTitle.setTextColor(0xFFFFD54F.toInt())
                 gameOverMsg.text = "$player derrotou $enemy."
+                gameOverScore.text =
+                    "+$POINTS_PER_WIN pontos\nTotal: $score   Recorde: $bestScore"
             } else {
                 gameOverTitle.text = "Game Over"
                 gameOverTitle.setTextColor(0xFFEF5350.toInt())
                 gameOverMsg.text = "$enemy derrotou $player."
+                gameOverScore.text =
+                    if (lostPoints > 0)
+                        "Você perdeu $lostPoints pontos.\nPontuação zerada.   Recorde: $bestScore"
+                    else
+                        "Pontuação zerada.   Recorde: $bestScore"
             }
             btnRematch.text = "Lutar de novo contra $enemy"
             gameOverOverlay.visibility = View.VISIBLE

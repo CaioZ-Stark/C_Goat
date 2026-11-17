@@ -75,6 +75,14 @@ class LocalizacaoController(
         Lugar(
             latitude = -25.246243,
             longitude = -50.021782
+        ),
+        Lugar(
+            latitude = -25.0774,
+            longitude =-50.15619
+        ),
+        Lugar(
+            latitude = -25.0691,
+            longitude = -50.1496
         )
     )
 
